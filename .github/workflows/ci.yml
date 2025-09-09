@@ -1,0 +1,42 @@
+name: CI - Build & Smoke test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'          # adapte si besoin
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci || npm install
+
+      - name: Build
+        run: npm run build
+
+      # Sert le dossier "build" en local pour le test
+      - name: Start server
+        run: |
+          npx --yes serve -s build -l 3000 & echo $! > server.pid
+          npx --yes wait-on http://localhost:3000
+
+      - name: Smoke test with curl
+        run: |
+          curl -I http://localhost:3000 | grep "200"   # statut 200 attendu
+
+      - name: Stop server
+        if: always()
+        run: |
+          kill $(cat server.pid) || true
